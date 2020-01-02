@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Algolia
 Plugin URI: https://github.com/WordPressUtilities/wpualgolia
-Version: 0.1.0
+Version: 0.2.0
 Description: Handle Algolia index for Custom Post Types
 Author: Darklg
 Author URI: http://darklg.me/
@@ -18,6 +18,7 @@ class WPUAlgolia {
     private $db_deleted_name = false;
     private $db_indexed = false;
     private $db_indexed_name = false;
+    private $index_batch_limit = 100;
     private $config = array(
         'plugin_id' => 'wpualgolia'
     );
@@ -38,6 +39,7 @@ class WPUAlgolia {
         $this->make_settings();
         $this->indexes = $this->get_indexes_structure();
         $this->set_databases();
+        $this->index_batch_limit = apply_filters('wpualgolia__index_batch_limit', $this->index_batch_limit);
     }
 
     public function make_settings() {
@@ -267,9 +269,18 @@ class WPUAlgolia {
         unset($posts);
 
         $algolia_items = array();
+        $item_indexed = array();
+        $iii = 0;
         foreach ($item_to_index as $item) {
             $object = $this->prepare_object($item, $index_key, $index);
-            $algolia_items[] = $object;
+            if ($iii >= $this->index_batch_limit) {
+                break;
+            }
+            if ($object !== false) {
+                $algolia_items[] = $object;
+                $item_indexed[] = $item;
+                $iii++;
+            }
         }
 
         /* Send to algolia */
@@ -278,7 +289,7 @@ class WPUAlgolia {
         }
 
         /* Store index info */
-        foreach ($item_to_index as $item) {
+        foreach ($item_indexed as $item) {
             if (isset($item['create'])) {
                 $this->insert_item($index_key, $item['ID'], 1);
             }
@@ -408,6 +419,9 @@ class WPUAlgolia {
             }
             if ($field['type'] == 'meta') {
                 $object[$field_id] = get_post_meta($item['ID'], $field_id, 1);
+            }
+            if ($field['type'] == 'callback' && isset($field['callback'])) {
+                $object[$field_id] = call_user_func($field['callback'], $item['ID'], $field_id);
             }
         }
 
