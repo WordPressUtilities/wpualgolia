@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU Algolia
 Plugin URI: https://github.com/WordPressUtilities/wpualgolia
-Version: 0.2.0
+Version: 0.2.1
 Description: Handle Algolia index for Custom Post Types
 Author: Darklg
 Author URI: http://darklg.me/
@@ -238,6 +238,8 @@ class WPUAlgolia {
             return "'" . esc_sql($v) . "'";
         }, $index['post_type']);
         $q = "SELECT ID,post_title,post_status FROM $wpdb->posts WHERE post_type IN(" . implode(',', $post_type) . ") AND post_status IN ('publish')";
+        $q = apply_filters('wpualgolia__post_query', $q, $index_key);
+
         $posts = $wpdb->get_results($q, ARRAY_A);
 
         /* Select all items from index */
